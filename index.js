@@ -1,4 +1,5 @@
 const _ = require('lodash')
+const json2csv = require('json2csv').Parser;
 const parse = require('csv-parse/lib/sync')
 const fs = require('fs')
 
@@ -140,7 +141,7 @@ function evaluate(datelists){
 // 8. Iterate until the best distribution is found
 let nbrSuccess = 0
 let success = []
-let successLimit = 10
+let successLimit = 1000
 let iteration = 0
 let points = 0
 let topPoint = 0
@@ -153,15 +154,99 @@ while(nbrSuccess < successLimit){
     nbrSuccess += 1
     success.push([points, dates])
     topPoint = Math.max(points, topPoint)
+    console.log(`Success found. Nbr: ${nbrSuccess}, points: ${points}`)
   }
 
   iteration++
-  if(iteration % 1000 === 0){
+  if(iteration % 10000 === 0){
     console.log(`Iteration ${iteration}`)
   }
 }
-console.log(`Success! ${points} reached`)
-success.forEach(x => console.log(`Success! ${x[0]} reached`))
+
+// Sort list by points DESC
+highscore = _.reverse(_.sortBy(success, x => x[0]))
+highscore.forEach( (x, idx) => console.log(`${idx+1}. ${x[0]} reached`))
+
+console.log()
+console.log('Top Score', highscore[0][0])
 
 // 9. Create output-files with best score
 
+let topdates = highscore[0][1]
+let apt = topdates[0]
+let main = topdates[1]
+let des = topdates[2]
+
+const fields = [
+  'host', 
+  'address', 
+  'area', 
+  'GuestPair1',
+  'GuestPair2',
+  'GuestPair3',
+  'Foodpref',
+  'Host phone',
+  'Guest1 phone',
+  'Guest2 phone',
+  'Guest3 phone',
+  'Afterparty Host',
+  'Afterparty Guest1',
+  'Afterparty Guest2',
+  'Afterparty Guest3',
+];
+const opts = { fields }
+
+function getCsv(list){
+  let data = list.map(a => {
+    host = a[0]
+    g1 = a[1]
+    g2 = a[2]
+    g3 = a[3]
+    foodpref = a.filter(x => x.foodpref).map( x => `${x.foodpref}`).join(' och ')
+    let obj = {
+      host: host.name + ' och ' + host.name2,
+      address: host.address,
+      area: host.area.join(', '),
+      GuestPair1: g1.name + ' och ' + g1.name2,
+      GuestPair2: g2.name + ' och ' + g2.name2,
+      GuestPair3: '-',
+      'Host phone': host.phone,
+      'Guest1 phone': g1.phone,
+      'Guest2 phone': g2.phone,
+      'Afterparty Host': host.afterparty,
+      'Afterparty Guest1': g1.afterparty,
+      'Afterparty Guest2': g2.afterparty,
+      'Foodpref': foodpref,
+    }
+    if(g3){
+      obj.GuestPair3 = g3.name + ' och ' + g3.name2
+      obj['Afterparty Guest3'] = g3.afterparty
+      obj['Guest3 phone'] = g3.phone
+    }
+    return obj
+  })
+
+  try{
+    const parser = new json2csv(opts);
+    const csv = parser.parse(data);
+    return csv
+  } catch (err ){
+    console.error(err);
+    return err
+  }
+}
+
+apt_csv = getCsv(apt)
+main_csv = getCsv(main)
+des_csv = getCsv(des)
+
+writeCsv(apt_csv, 'apt')
+writeCsv(main_csv, 'main')
+writeCsv(des_csv, 'dessert')
+function writeCsv(csv, name){
+  var stream = fs.createWriteStream("scores/" + highscore[0][0]  + "_" + name + ".csv");
+  stream.once('open', function(fd) {
+    stream.write(csv);
+    stream.end();
+  });
+}
