@@ -45,47 +45,50 @@ for(let i = 0; i < singles.length; i+=2){
 }
 
 
-function createDateLists(){
+function createDistributionList(){
   // 3. Shuffle list of pairs
   pairs = _.shuffle(pairs)
 
-  // 4. Create three date lists. One for aptizer, one for the main course
+  // 4. Create three meal lists. One for aptizer, one for the main course
   //    and one for the desert.
-  let nbrOfDates = parseInt(pairs.length / 3)
-  let dates = [
+  //    A meal will contain a list of pairs. Where the first one is the host,
+  //    and the others are the guests of the meal.
+  let nbrOfDates  = parseInt(pairs.length / 3)
+  let meals = [
     [], // Aptizers
     [], // Maincourse
     [], // Desert
   ]
+  // Set a pair (of attendees) as hosts for each meal
   for(let i = 0; i < pairs.length; i++){
-    if(dates[i%3].length < nbrOfDates){
-      dates[i%3].push([pairs[i]])
+    if(meals[i%3].length < nbrOfDates){
+      meals[i%3].push([pairs[i]])
     } else {
-      dates[i%3][0].push(pairs[i])
+      meals[i%3][0].push(pairs[i])
     }
   } 
 
-  // 5. Fill all dates in all date-list. One pair can only be en one date-list 
+  // 5. Fill all guests in all meal-list. One pair can only be en one meal-list 
   //    once. 
-  dates.forEach( (date, i) => {
-    let diff = _.difference(pairs, _.flatten(date))
+  meals.forEach( (meal, i) => {
+    let diff = _.difference(pairs, _.flatten(meal))
     diff = _.shuffle(diff)
     diff.forEach( (d, idx) => {
-      dates[i][idx%nbrOfDates].push(d)
+      meals[i][idx%nbrOfDates].push(d)
     })
   })  
-  return dates
+  return meals
 }
 // 7. Evaluate function.
 //    Cuz we randomize so we have to evaluate how good a distribution
 //    is. 
 
-function evaluate(datelists){
+function evaluate(mealList){
   let points = 10;
   
   // Penalty if two pair eat together twice.
   pairs.forEach(pair => {
-    let attendees = datelists.reduce( (acc, curr) => {
+    let attendees = mealList.reduce( (acc, curr) => {
       let meal = curr.filter( c => _.indexOf(c, pair) >= 0 )
       return acc.concat(meal)
     }, [])
@@ -96,12 +99,12 @@ function evaluate(datelists){
       points = -1
     }
   })
-  if(points < 0){
+  if(points < 0){ // Dont allow this rule to be broken
     return points
   }
 
-  // Add points ifall in same dessert are grouped by afterparty.
-  let dessertSchedule = datelists[2]
+  // Add points if all who eat desert together are grouped by afterparty.
+  let dessertSchedule = mealList[2]
   dessertSchedule.forEach(ds => {
     let [after, noafter] = _.partition(ds, x => x.afterparty)
     if(after.length === 0 || noafter.length === 0){
@@ -109,9 +112,9 @@ function evaluate(datelists){
     }
   })
 
-  // Add points if people stay in same zone.
+  // Add points if people stay in same zone during all meals.
   pairs.forEach(pair => {
-    let attendees = datelists.reduce( (acc, curr) => {
+    let attendees = mealList.reduce( (acc, curr) => {
       let meal = curr.filter( c => _.indexOf(c, pair) >= 0 )
       return acc.concat(meal)
     }, [])
@@ -119,14 +122,15 @@ function evaluate(datelists){
     let areas = _.flatten(hosts.map(x => x.area))
     let areaSet = new Set(areas)
 
+    // Add point if same zone, neutral if two zones, and negativ points if more
     points += (2 - areaSet.size)    
   })
   if(points < 0){
     return points
   }
 
-  // Add points if people at dessert are in center-zone.
-  datelists.forEach(dl => {
+  // Add points if afterparty-people at dessert are in center-zone.
+  mealList.forEach(dl => {
     points += dl.reduce( (acc, curr) => {
       if(curr[0].afterparty && _.indexOf(curr[0].area, 'Centralt') >= 0){
         acc++
@@ -134,25 +138,24 @@ function evaluate(datelists){
       return acc
     }, 0)
   })
-
   return  points;
 }
 
 // 8. Iterate until the best distribution is found
 let nbrSuccess = 0
 let success = []
-let successLimit = 1000
+let successLimit = 10 
 let iteration = 0
 let points = 0
 let topPoint = 0
-let dates = []
+let distribution = []
 while(nbrSuccess < successLimit){
-  dates = createDateLists() 
-  points = evaluate(dates)
+  distribution = createDistributionList() 
+  points = evaluate(distribution)
 
   if(points > 0){
     nbrSuccess += 1
-    success.push([points, dates])
+    success.push([points, distribution])
     topPoint = Math.max(points, topPoint)
     console.log(`Success found. Nbr: ${nbrSuccess}, points: ${points}`)
   }
@@ -165,17 +168,19 @@ while(nbrSuccess < successLimit){
 
 // Sort list by points DESC
 highscore = _.reverse(_.sortBy(success, x => x[0]))
+console.log()
 highscore.forEach( (x, idx) => console.log(`${idx+1}. ${x[0]} reached`))
 
+console.log()
 console.log()
 console.log('Top Score', highscore[0][0])
 
 // 9. Create output-files with best score
 
-let topdates = highscore[0][1]
-let apt = topdates[0]
-let main = topdates[1]
-let des = topdates[2]
+let topdistribution = highscore[0][1]
+let apt = topdistribution[0]
+let main = topdistribution[1]
+let des = topdistribution[2]
 
 const fields = [
   'host', 
