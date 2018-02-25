@@ -163,3 +163,5 @@ while(nbrSuccess < successLimit){
 console.log(`Success! ${points} reached`)
 success.forEach(x => console.log(`Success! ${x[0]} reached`))
 
+// 9. Create output-files with best score
+
