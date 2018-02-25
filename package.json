@@ -1,0 +1,26 @@
+{
+  "name": "cykelfest",
+  "version": "1.0.0",
+  "description": "Fördelning av cykelfest deltagare",
+  "main": "index.js",
+  "dependencies": {
+    "csv-parse": "^2.0.4",
+    "fs": "0.0.1-security",
+    "lodash": "^4.17.5"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lundakarnevalen/cykelfest.git"
+  },
+  "author": "cNille",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Lundakarnevalen/cykelfest/issues"
+  },
+  "homepage": "https://github.com/Lundakarnevalen/cykelfest#readme"
+}
