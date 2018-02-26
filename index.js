@@ -92,10 +92,13 @@ function evaluate(mealList){
       let meal = curr.filter( c => _.indexOf(c, pair) >= 0 )
       return acc.concat(meal)
     }, [])
-    let set = new Set(_.flatten(attendees))
+    const guestCount = attendees.reduce( (acc, curr) => acc + curr.length, 0)
+    const set = new Set(_.flatten(attendees))
 
     // If size is less than 7, then two pair have eaten together twice
-    if(set.size < 7){
+    // Remove 2 because of the duplicate of the pair in mealLists
+    const limit = guestCount - 2
+    if(set.size < limit){
       points = -1
     }
   })
