@@ -1,3 +1,5 @@
+// Skapat av Christopher Nilsson (cNille @ github) för Lundakarnevalens cykelfest. 
+// Vid frågor kontakta: c@shapeapp.se
 const _ = require('lodash')
 const json2csv = require('json2csv').Parser;
 const parse = require('csv-parse/lib/sync')
