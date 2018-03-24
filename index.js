@@ -124,11 +124,18 @@ function evaluate(mealList){
       return acc.concat(meal)
     }, [])
     let hosts = attendees.map(x => x[0])
-    let areas = _.flatten(hosts.map(x => x.area))
-    let areaSet = new Set(areas)
 
-    // Add point if same zone, neutral if two zones, and negativ points if more
-    points += (2 - areaSet.size)    
+    // Select the first area of the host as their selected area
+    let areas = _.flatten(hosts.map(x => x.area[0]))
+    
+    let areaChange = 0
+    for(let i = 0; i < areas.length - 2; i++) {
+      if(areas[i] !== areas[i+1]){
+        areaChange++
+      }
+    }
+    // Add point the fewer times a pair stays in same area
+    points += areas.length - 1 - areaChange
   })
   if(points < 0){
     return points
