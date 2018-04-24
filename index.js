@@ -177,7 +177,15 @@ function evaluate(mealList) {
 // 8. Iterate until the best distribution is found
 let nbrSuccess = 0
 let success = []
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
 let successLimit = 10
+=======
+let successLimit = 1
+>>>>>>> Stashed changes
+=======
+let successLimit = 1
+>>>>>>> Stashed changes
 let iteration = 0
 let points = 0
 let topPoint = 0
