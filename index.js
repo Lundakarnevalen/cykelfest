@@ -12,42 +12,40 @@ let data = parse(input, { columns: true });
 let allEntries = data.map(p => {
   return {
     'time': p['Tidstämpel'],
-    'name': p['Namn 1'],
+    'name': p['Namn 1 '],
     'email1': p['Email 1'],
-    'name2': p['Namn 2'],
-    'email2': p['Email 2'],
-    'name3': p['Namn 3'],
-    'email3': p['Email 3'],
-    'peoples': p['Vi är så här många i vårt lilla gäng!'],
+    'name2': p['Namn 2'] + ', ' + p['Namn 3'],
+    'email2': p['Email 2'] + ', ' + p['Email 3'],
+    'size': p['Vi är så här många i vårt lilla gäng!'],
     'groups': p['Vilken nollningsgrupp'],
-    'area': [p['Adress där maten ska förtäras / Address where the food will be served ']],
+    'address': [p['Adress där maten ska förtäras / Address where the food will be served ']],
     'phone': p['Telefonnummer till deltagande / Phone number to all attending '],
     'foodpref': p['Matpreferenser? (specificera för vem, men ändå inte för vem se beskrivning) / Food preferences? (specify for who attending) '],
     'restrictions': p['Eventuella restriktioner:Ex) Jag har hund, kan endast vara hos mig efter 20, pälsallergiker'],
-    'district': p['Stadsdel där maten ska förtäras / District where the food will be served ']
+    'area': p['Stadsdel där maten ska förtäras / District where the food will be served ']
   }
 })
 
 // 2. Match all singles to pairs. 
-let [pairs, singles] = _.partition(allEntries, p => !!p.name2)
-for (let i = 0; i < singles.length; i += 2) {
-  let a = singles[i]
-  let b = singles[i + 1] || {}
-  let joined = {
-    'time': a.time,
-    'name': a.name,
-    'attend': a.attend,
-    'name2': b.name || '',
-    'address': a.address + ' ::: ' + (b.address || ''),
-    'phone': a.phone + ' ::: ' + (b.phone || ''),
-    'afterparty': b.afterparty || a.afterparty,
-    'iam': a.iam,
-    'foodpref': a.foodpref + ' ::: ' + (b.foodpref || ''),
-    'area': b.area ? a.area.concat(b.area) : a.area,
-    'pepp': a.pepp
-  }
-  pairs.push(joined)
-}
+// let [pairs, singles] = _.partition(allEntries, p => !!p.name2)
+// for (let i = 0; i < singles.length; i += 2) {
+//   let a = singles[i]
+//   let b = singles[i + 1] || {}
+//   let joined = {
+//     'time': a.time,
+//     'name': a.name,
+//     'name2': b.name || '',
+//     'address': a.address + ' ::: ' + (b.address || ''),
+//     'phone': a.phone + ' ::: ' + (b.phone || ''),
+//     'foodpref': a.foodpref + ' ::: ' + (b.foodpref || ''),
+//     'area': b.area ? a.area.concat(b.area) : a.area,
+//     'pepp': a.pepp
+//   }
+let pairs = []
+allEntries.map(allEntrie => {
+  pairs.push(allEntrie)
+})
+
 
 
 function createDistributionList() {
@@ -89,8 +87,7 @@ function createDistributionList() {
 //    is. 
 
 function evaluate(mealList) {
-  let points = 10;
-
+  let points = 10000;
   // Penalty if two pair eat together twice.
   pairs.forEach(pair => {
     let attendees = mealList.reduce((acc, curr) => {
@@ -112,18 +109,20 @@ function evaluate(mealList) {
   }
 
   // Check if the same group meet eachother sometime, in that case return -1
-  try {
-    mealList.forEach(course => {
-      course.forEach(location => {
-        location.forEach(pair => {
-          let meetings = pair.filter(p => _.indexOf(p, p.groups) >= 0)
-        })
-      })
+  let sameGroup = false
+  mealList.forEach(meal => {
+    meal.forEach(group => {
+      if (group[0].groups === group[1].groups || group[0].groups === group[2].groups || group[1].groups === group[2].groups) {
+        sameGroup = true
+      }
     })
-  } catch (e) {
-    return -1
-  }
+  })
 
+  if (sameGroup) {
+    points = -1
+    return points
+  }
+  // Select the group of the host
   // // Add points if all who eat desert together are grouped by afterparty.
   // let dessertSchedule = mealList[2]
   // dessertSchedule.forEach(ds => {
@@ -132,6 +131,33 @@ function evaluate(mealList) {
   //     points += 1
   //   }
   // })
+
+  // Add points if group size is right or only one 3 group
+  let size = 0
+  mealList.forEach(meal => {
+    meal.forEach(group => {
+      size = parseInt(group[0].size) + parseInt(group[1].size) + parseInt(group[2].size)
+      if (size === 6 || size === 7) {
+        points += 2
+      }
+      if (size === 8) {
+        points -= 2
+      }
+      if (size < 5) {
+        points -= 70
+      }
+      if (size < 6) {
+        points -= 30
+      }
+    })
+  })
+
+  const main = mealList[1]
+  main.forEach(group => {
+    if (parseInt(group[0].size) === 3) {
+      points += 5
+    }
+  })
 
   // Add points if people stay in same zone during all meals.
   pairs.forEach(pair => {
@@ -177,21 +203,14 @@ function evaluate(mealList) {
 // 8. Iterate until the best distribution is found
 let nbrSuccess = 0
 let success = []
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-let successLimit = 10
-=======
-let successLimit = 1
->>>>>>> Stashed changes
-=======
-let successLimit = 1
->>>>>>> Stashed changes
+let successLimit = 20
 let iteration = 0
 let points = 0
 let topPoint = 0
 let distribution = []
 while (nbrSuccess < successLimit) {
   distribution = createDistributionList()
+
   points = evaluate(distribution)
 
   if (points > 0) {
@@ -217,7 +236,6 @@ console.log()
 console.log('Top Score', highscore[0][0])
 
 // 9. Create output-files with best score
-
 let topdistribution = highscore[0][1]
 let apt = topdistribution[0]
 let main = topdistribution[1]
@@ -225,20 +243,13 @@ let des = topdistribution[2]
 
 const fields = [
   'host',
-  'address',
-  'area',
   'GuestPair1',
   'GuestPair2',
-  'GuestPair3',
+  'address',
   'Foodpref',
   'Host phone',
-  'Guest1 phone',
-  'Guest2 phone',
-  'Guest3 phone',
-  'Afterparty Host',
-  'Afterparty Guest1',
-  'Afterparty Guest2',
-  'Afterparty Guest3',
+  'Emails',
+  'Size of parTY'
 ];
 const opts = { fields }
 
@@ -249,27 +260,20 @@ function getCsv(list) {
     g2 = a[2]
     g3 = a[3]
     foodpref = a.filter(x => x.foodpref).map(x => `${x.foodpref}`).join('\n')
+
     let obj = {
       host: host.name + ', ' + host.name2,
       address: host.address,
-      area: host.area.join(', '),
-      GuestPair1: g1.name + ', ' + g1.name2 + ', ' + g1.name3,
-      GuestPair2: g2.name + ', ' + g2.name2 + ', ' + g2.name3,
+      GuestPair1: g1.name + ', ' + g1.name2,
+      GuestPair2: g2.name + ', ' + g2.name2,
       GuestPair3: '-',
       'Host phone': host.phone,
-      'Guest1 phone': g1.phone,
-      'Guest2 phone': g2.phone,
-      'Afterparty Host': host.afterparty,
-      'Afterparty Guest1': g1.afterparty,
-      'Afterparty Guest2': g2.afterparty,
-      'Foodpref': foodpref,
-      'Emails': host.name1 + ', ' + host.email2 + ', ' + host.email3,
-      'Email text': host.prefs
+      Foodpref: foodpref,
+      Emails: host.email1 + ', ' + host.email2,
+      'Size of parTY': parseInt(host.size) + parseInt(g1.size) + parseInt(g2.size)
     }
     if (g3) {
       obj.GuestPair3 = g3.name + ', ' + g3.name2
-      obj['Afterparty Guest3'] = g3.afterparty
-      obj['Guest3 phone'] = g3.phone
     }
     return obj
   })
