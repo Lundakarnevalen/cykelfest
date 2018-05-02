@@ -3,3 +3,4 @@ input.csv
 *.swp
 node_modules/*
 scores/*
+package-lock.json

@@ -7,21 +7,21 @@ const fs = require('fs')
 
 
 // 1. Load all input data
-let input = fs.readFileSync(__dirname+'/input.csv', 'utf-8');
+let input = fs.readFileSync(__dirname+'/inputdata.csv', 'utf-8');
 let data = parse(input, {columns: true});
 let allEntries = data.map(p => {
   return {
     'time': p['Tidstämpel'],
-    'name': p['Namn'],
-    'attend': p['Jag vill anmäla mig'],
-    'name2': p['(Om anmälan sker i par) - Jag vill anmäla mig tillsammans med'],
-    'address': p['Adress där måltiden ska förtäras'],
-    'phone': p['Telefonnummer till båda i paret (tydligt vems som är vems)'],
-    'afterparty': p['Jag/Vi vill ha förköp till Malmös?'].startsWith('Ja'),
+    'name': p['Namn / Name'],
+    'attend': p['Jag vill anmäla mig / I want to attend'],
+    'name2': p['Jag vill anmäla mig tillsammans med; / I want to attend with;'],
+    'address': p['Adress där maten ska förtäras / Address where the food will be served'],
+    'phone': p['Telefonnummer till deltagande / Phone number to all attending'],
+    'afterparty': p['Vill ni ha förköp till VGs? / Do you want tickets to VGs? (60 kr)'].startsWith('Ja'),
     'iam': p['Jag är'],
-    'foodpref': p['Matpreferenser på dig/på någon i paret?'],
-    'area': [p['Jag bor (lättare för oss då vi ska försöka minimera cykelsträckan)']],
-    'pepp': p['ÄR DU TAGGAD?!??!']
+    'foodpref': p['Matpreferenser? (specificera för vem) / Food preferences? (specify for who attending) '],
+    'area': [p['Stadsdel där maten ska förtäras / District where the food will be served']],
+    'pepp': p['How excited are you???']
   }
 })
 
@@ -35,12 +35,12 @@ for(let i = 0; i < singles.length; i+=2){
     'name': a.name,
     'attend': a.attend,
     'name2': b.name || '',
-    'address': a.address + ' ::: ' + (b.address || ''),
+    'address': a.address,
     'phone': a.phone + ' ::: ' + (b.phone || ''),
     'afterparty': b.afterparty || a.afterparty,
     'iam': a.iam,
     'foodpref': a.foodpref + ' ::: ' + (b.foodpref || ''),
-    'area': b.area ? a.area.concat(b.area) : a.area,
+    'area': a.area, // Just take the first ones area
     'pepp': a.pepp
   }
   pairs.push(joined)
@@ -86,7 +86,7 @@ function createDistributionList(){
 //    is. 
 
 function evaluate(mealList){
-  let points = 10;
+  let points = 40;
   
   // Penalty if two pair eat together twice.
   pairs.forEach(pair => {
@@ -112,9 +112,7 @@ function evaluate(mealList){
   let dessertSchedule = mealList[2]
   dessertSchedule.forEach(ds => {
     let [after, noafter] = _.partition(ds, x => x.afterparty)
-    if(after.length === 0 || noafter.length === 0){
-      points += 1
-    }
+    points += Math.abs(after.length - noafter.length) * 2
   })
 
   // Add points if people stay in same zone during all meals.
@@ -129,13 +127,17 @@ function evaluate(mealList){
     let areas = _.flatten(hosts.map(x => x.area[0]))
     
     let areaChange = 0
-    for(let i = 0; i < areas.length - 2; i++) {
+    //console.log(areas)
+    for(let i = 0; i < areas.length - 1; i++) {
       if(areas[i] !== areas[i+1]){
         areaChange++
+        //console.log(areas[i], areas[i+1])
       }
     }
+    //console.log(areaChange)
     // Add point the fewer times a pair stays in same area
-    points += areas.length - 1 - areaChange
+    areaScore = 2 - (areaChange * 2)
+    points += areaScore
   })
   if(points < 0){
     return points
@@ -144,19 +146,19 @@ function evaluate(mealList){
   // Add points if afterparty-people at dessert are in center-zone.
   mealList.forEach(dl => {
     points += dl.reduce( (acc, curr) => {
-      if(curr[0].afterparty && _.indexOf(curr[0].area, 'Centralt') >= 0){
+      if(curr[0].afterparty && _.indexOf(curr[0].area, 'Österort / East') >= 0){
         acc++
       }
       return acc
     }, 0)
   })
-  return  points;
+  return points;
 }
 
 // 8. Iterate until the best distribution is found
 let nbrSuccess = 0
 let success = []
-let successLimit = 10 
+let successLimit = 200 
 let iteration = 0
 let points = 0
 let topPoint = 0
@@ -189,81 +191,90 @@ console.log('Top Score', highscore[0][0])
 
 // 9. Create output-files with best score
 
-let topdistribution = highscore[0][1]
-let apt = topdistribution[0]
-let main = topdistribution[1]
-let des = topdistribution[2]
-
-const fields = [
-  'host', 
-  'address', 
-  'area', 
-  'GuestPair1',
-  'GuestPair2',
-  'GuestPair3',
-  'Foodpref',
-  'Host phone',
-  'Guest1 phone',
-  'Guest2 phone',
-  'Guest3 phone',
-  'Afterparty Host',
-  'Afterparty Guest1',
-  'Afterparty Guest2',
-  'Afterparty Guest3',
-];
-const opts = { fields }
-
-function getCsv(list){
-  let data = list.map(a => {
-    host = a[0]
-    g1 = a[1]
-    g2 = a[2]
-    g3 = a[3]
-    foodpref = a.filter(x => x.foodpref).map( x => `${x.foodpref}`).join(' och ')
-    let obj = {
-      host: host.name + ' och ' + host.name2,
-      address: host.address,
-      area: host.area.join(', '),
-      GuestPair1: g1.name + ' och ' + g1.name2,
-      GuestPair2: g2.name + ' och ' + g2.name2,
-      GuestPair3: '-',
-      'Host phone': host.phone,
-      'Guest1 phone': g1.phone,
-      'Guest2 phone': g2.phone,
-      'Afterparty Host': host.afterparty,
-      'Afterparty Guest1': g1.afterparty,
-      'Afterparty Guest2': g2.afterparty,
-      'Foodpref': foodpref,
-    }
-    if(g3){
-      obj.GuestPair3 = g3.name + ' och ' + g3.name2
-      obj['Afterparty Guest3'] = g3.afterparty
-      obj['Guest3 phone'] = g3.phone
-    }
-    return obj
-  })
-
-  try{
-    const parser = new json2csv(opts);
-    const csv = parser.parse(data);
-    return csv
-  } catch (err ){
-    console.error(err);
-    return err
-  }
+// Top distributions to save
+for(let i = 0; i < 3; i++){
+  console.log(`Printing ${i} ...`)
+  let topdistribution = highscore[i][1]
+  let score = highscore[i][0]
+  outputdistribution(topdistribution, score)
 }
 
-apt_csv = getCsv(apt)
-main_csv = getCsv(main)
-des_csv = getCsv(des)
+function outputdistribution(distribution, score){
 
-writeCsv(apt_csv, 'apt')
-writeCsv(main_csv, 'main')
-writeCsv(des_csv, 'dessert')
-function writeCsv(csv, name){
-  var stream = fs.createWriteStream("scores/" + highscore[0][0]  + "_" + name + ".csv");
+  let apt = distribution[0]
+  let main = distribution[1]
+  let des = distribution[2]
+
+  const fields = [
+    'course', 
+    'host', 
+    'address', 
+    'area', 
+    'GuestPair1',
+    'GuestPair2',
+    'GuestPair3',
+    'Foodpref',
+    'Host phone',
+    'Guest1 phone',
+    'Guest2 phone',
+    'Guest3 phone',
+    'Afterparty Host',
+    'Afterparty Guest1',
+    'Afterparty Guest2',
+    'Afterparty Guest3',
+  ];
+  const opts = { fields }
+
+  function getCsv(list, course){
+    let data = list.map(a => {
+      host = a[0]
+      g1 = a[1]
+      g2 = a[2]
+      g3 = a[3]
+      foodpref = a.filter(x => x.foodpref).map( x => `${x.foodpref}`).join(' och ')
+      let obj = {
+        course: course,
+        host: host.name + ' och ' + host.name2,
+        address: host.address,
+        area: host.area.join(', '),
+        GuestPair1: g1.name + ' och ' + g1.name2,
+        GuestPair2: g2.name + ' och ' + g2.name2,
+        GuestPair3: '-',
+        'Host phone': host.phone,
+        'Guest1 phone': g1.phone,
+        'Guest2 phone': g2.phone,
+        'Afterparty Host': host.afterparty,
+        'Afterparty Guest1': g1.afterparty,
+        'Afterparty Guest2': g2.afterparty,
+        'Foodpref': foodpref,
+      }
+      if(g3){
+        obj.GuestPair3 = g3.name + ' och ' + g3.name2
+        obj['Afterparty Guest3'] = g3.afterparty
+        obj['Guest3 phone'] = g3.phone
+      }
+      return obj
+    })
+
+    try{
+      const parser = new json2csv(opts);
+      const csv = parser.parse(data);
+      return csv
+    } catch (err ){
+      console.error(err);
+      return err
+    }
+  }
+
+  apt_csv = getCsv(apt, 'Förrätt')
+  main_csv = getCsv(main, 'Huvudrätt')
+  des_csv = getCsv(des, 'Efterrätt')
+
+  var stream = fs.createWriteStream("scores/" + score  + ".csv");
   stream.once('open', function(fd) {
-    stream.write(csv);
+    stream.write(apt_csv);
+    stream.write(main_csv);
+    stream.write(des_csv);
     stream.end();
   });
 }
