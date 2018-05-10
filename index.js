@@ -157,7 +157,7 @@ function evaluate (mealList) {
 // 8. Iterate until the best distribution is found
 let nbrSuccess = 0
 let success = []
-let successLimit = 200
+let successLimit = 10
 let iteration = 0
 let points = 0
 let topPoint = 0
@@ -273,6 +273,88 @@ function outputdistribution (distribution, score) {
     stream.write(aptCsv)
     stream.write(mainCsv)
     stream.write(desCsv)
+    stream.end()
+  })
+}
+
+// Top distributions to save
+console.log(`Printing ${0} ...`)
+let topdistribution = highscore[0][1]
+let score = highscore[0][0]
+outputguestlist(topdistribution, score)
+
+function outputguestlist (distribution, score) {
+  const pairData = pairs.map(pair => {
+    let attendees = distribution.reduce((acc, curr) => {
+      let meal = curr.filter(c => _.indexOf(c, pair) >= 0)
+      return acc.concat(meal)
+    }, [])
+
+    let pairname = pair.name
+    let pairemail = pair.email
+
+    let aptaddress = attendees[0][0].address
+    let mainaddress = attendees[1][0].address
+    let desaddress = attendees[2][0].address
+
+    let aptphone = attendees[0][0].phone
+    let mainphone = attendees[1][0].phone
+    let desphone = attendees[2][0].phone
+
+    let apthosts = attendees[0][0].name
+    let mainhosts = attendees[1][0].name
+    let deshosts = attendees[2][0].name
+
+    let aptfoodpref = attendees[0][0].foodpref
+    let mainfoodpref = attendees[1][0].foodpref
+    let desfoodpref = attendees[2][0].foodpref
+
+    return {
+      pairname,
+      pairemail,
+      aptaddress,
+      aptphone,
+      apthosts,
+      aptfoodpref,
+      mainaddress,
+      mainphone,
+      mainhosts,
+      mainfoodpref,
+      desaddress,
+      desphone,
+      deshosts,
+      desfoodpref
+    }
+  })
+
+  const fields = [
+    'pairname',
+    'pairemail',
+    'aptaddress',
+    'aptphone',
+    'apthosts',
+    'aptfoodpref',
+    'mainaddress',
+    'mainphone',
+    'mainhosts',
+    'mainfoodpref',
+    'desaddress',
+    'desphone',
+    'deshosts',
+    'desfoodpref'
+  ]
+  const opts = { fields }
+
+  var stream = fs.createWriteStream('pairscores/' + score + '.csv')
+  stream.once('open', function (fd) {
+    try {
+      const parser = new Json2csv(opts)
+      const csv = parser.parse(pairData)
+      stream.write(csv)
+    } catch (err) {
+      console.error(err)
+      return err
+    }
     stream.end()
   })
 }
