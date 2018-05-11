@@ -5,23 +5,24 @@ const Json2csv = require('json2csv').Parser
 const parse = require('csv-parse/lib/sync')
 const fs = require('fs')
 const path = require('path')
+const pdf = require('html-pdf')
 
 // 1. Load all input data
-let input = fs.readFileSync(path.join(__dirname, '/inputdata.csv'), 'utf-8')
-let data = parse(input, {columns: true})
+let input = fs.readFileSync(path.join(__dirname, '/input.csv'), 'utf-8')
+let data = parse(input, { columns: true })
 let allEntries = data.map(p => {
   return {
     'time': p['Tidstämpel'],
-    'name': p['Namn / Name'],
+    'name': p['Namn 1/Name 1'],
+    'email': p['Email 1'],
+    'name2': p['Namn 2/Name 2'],
+    'email2': p['Email 2'],
     'attend': p['Jag vill anmäla mig / I want to attend'],
-    'name2': p['Jag vill anmäla mig tillsammans med; / I want to attend with;'],
-    'address': p['Adress där maten ska förtäras / Address where the food will be served'],
-    'phone': p['Telefonnummer till deltagande / Phone number to all attending'],
-    'afterparty': p['Vill ni ha förköp till VGs? / Do you want tickets to VGs? (60 kr)'].startsWith('Ja'),
-    'iam': p['Jag är'],
-    'foodpref': p['Matpreferenser? (specificera för vem) / Food preferences? (specify for who attending) '],
-    'area': [p['Stadsdel där maten ska förtäras / District where the food will be served']],
-    'pepp': p['How excited are you???']
+    'address': p['Adress där maten ska förtäras / Address where the food will be served '],
+    'phone': p['Telefonnummer till deltagare/Phonenumber to all attending'],
+    'restric': p['Eventuella restriktioner:Ex) Jag har hund, kan endast vara hos mig efter 20, pälsallergiker / Eventuual restrictions: e.g) I have a dog, can only be at me until 8am, allergic to fur etc.'],
+    'foodpref': p['Matpreferenser? (specificera för vem, men ändå inte för vem se beskrivning) / Food preferences? (specify for who attending) '],
+    'area': [p['Stadsdel där maten ska förtäras / District where the food will be served ']],
   }
 })
 
@@ -46,7 +47,23 @@ for (let i = 0; i < singles.length; i += 2) {
   pairs.push(joined)
 }
 
-function createDistributionList () {
+// 2.1 Check so no double sign ups
+let brokenOn = []
+for (let i = 0; i < pairs.length - 3; i++){
+  for (let j = 0; j < pairs.length; j++){
+    if (i === j) continue
+    if (pairs[i].email == pairs[j].email || pairs[i].email == pairs[j].email2) {
+      brokenOn.push(pairs[i])
+    } 
+  }
+}
+
+if (brokenOn.length > 0) {
+  console.log("These are present atleast twice, should they really be that!?")
+  console.log(brokenOn)
+  return process.exit(1)
+}
+function createDistributionList() {
   // 3. Shuffle list of pairs
   pairs = _.shuffle(pairs)
 
@@ -84,7 +101,7 @@ function createDistributionList () {
 //    Cuz we randomize so we have to evaluate how good a distribution
 //    is.
 
-function evaluate (mealList) {
+function evaluate(mealList) {
   let points = 40
 
   // Penalty if two pair eat together twice.
@@ -157,7 +174,7 @@ function evaluate (mealList) {
 // 8. Iterate until the best distribution is found
 let nbrSuccess = 0
 let success = []
-let successLimit = 10
+let successLimit = 5
 let iteration = 0
 let points = 0
 let topPoint = 0
@@ -198,7 +215,7 @@ for (let i = 0; i < 3; i++) {
   outputdistribution(topdistribution, score)
 }
 
-function outputdistribution (distribution, score) {
+function outputdistribution(distribution, score) {
   let apt = distribution[0]
   let main = distribution[1]
   let des = distribution[2]
@@ -206,6 +223,7 @@ function outputdistribution (distribution, score) {
   const fields = [
     'course',
     'host',
+    'restrictions',
     'address',
     'area',
     'GuestPair1',
@@ -223,7 +241,7 @@ function outputdistribution (distribution, score) {
   ]
   const opts = { fields }
 
-  function getCsv (list, course) {
+  function getCsv(list, course) {
     let data = list.map(a => {
       const host = a[0]
       const g1 = a[1]
@@ -233,6 +251,7 @@ function outputdistribution (distribution, score) {
       let obj = {
         course: course,
         host: host.name + ' och ' + host.name2,
+        restrictions: host.restric + ', ' + g1.restric + ', ' + g2.restric,
         address: host.address,
         area: host.area.join(', '),
         GuestPair1: g1.name + ' och ' + g1.name2,
@@ -268,7 +287,7 @@ function outputdistribution (distribution, score) {
   const mainCsv = getCsv(main, 'Huvudrätt')
   const desCsv = getCsv(des, 'Efterrätt')
 
-  var stream = fs.createWriteStream('scores/' + score + '.csv')
+  var stream = fs.createWriteStream('scores/best.csv')
   stream.once('open', function (fd) {
     stream.write(aptCsv)
     stream.write(mainCsv)
@@ -283,15 +302,15 @@ let topdistribution = highscore[0][1]
 let score = highscore[0][0]
 outputguestlist(topdistribution, score)
 
-function outputguestlist (distribution, score) {
+function outputguestlist(distribution, score) {
   const pairData = pairs.map(pair => {
     let attendees = distribution.reduce((acc, curr) => {
       let meal = curr.filter(c => _.indexOf(c, pair) >= 0)
       return acc.concat(meal)
     }, [])
 
-    let pairname = pair.name
-    let pairemail = pair.email
+    let pairname = pair.name.concat(" och ", pair.name2)
+    let pairemail = pair.email.concat(", ", pair.email2)
 
     let aptaddress = attendees[0][0].address
     let mainaddress = attendees[1][0].address
@@ -301,17 +320,50 @@ function outputguestlist (distribution, score) {
     let mainphone = attendees[1][0].phone
     let desphone = attendees[2][0].phone
 
-    let apthosts = attendees[0][0].name
-    let mainhosts = attendees[1][0].name
-    let deshosts = attendees[2][0].name
+    let otheraptphone = attendees[0][1].phone + ', ' + attendees[0][2].phone
+    let othermainphone = attendees[1][1].phone + ', ' + attendees[1][2].phone
+    let otherdesphone = attendees[2][1].phone + ', ' + attendees[2][2].phone
+    
+    let apthosts = attendees[0][0].name.concat(" och ", attendees[0][0].name2)
+    let mainhosts = attendees[1][0].name.concat(" och ", attendees[1][0].name2)
+    let deshosts = attendees[2][0].name.concat(" och ", attendees[2][0].name2)
+    
+    let aptfoodpref = attendees[0].map(c => c.foodpref).join(", ")
+    let mainfoodpref = attendees[1].map(c => c.foodpref).join(", ")
+    let desfoodpref = attendees[2].map(c => c.foodpref).join(", ")
 
-    let aptfoodpref = attendees[0][0].foodpref
-    let mainfoodpref = attendees[1][0].foodpref
-    let desfoodpref = attendees[2][0].foodpref
+    const html = fs.readFileSync('./template.html', 'utf8')
+      .replace('APTADDRESS', aptaddress)
+      .replace('APTHOSTS', apthosts)
+      .replace('APTPHONE', aptphone)
+      .replace('OTHERAPTPHONE', otheraptphone)
+      .replace('APTFOODPREF', aptfoodpref)
+
+      .replace('MAINADDRESS', mainaddress)
+      .replace('MAINHOSTS', mainhosts)
+      .replace('MAINPHONE', mainphone)
+      .replace('OTHERMAINPHONE', othermainphone)
+      .replace('MAINFOODPREF', mainfoodpref)
+      
+      .replace('DESADDRESS', desaddress)
+      .replace('DESHOSTS', deshosts)
+      .replace('DESPHONE', desphone)
+      .replace('OTHERDESPHONE', otherdesphone)
+      .replace('DESFOODPREF', desfoodpref)
+
+    let pdfName = (pairname + '.pdf').replace(/ /g, '_')
+    pdf.create(html, {
+      format: 'a4',
+      renderDelay: 2000
+    }).toFile(('./pdfs/' + pairname + '.pdf').replace(/ /g, '_', ), (err, res) => {
+      if (err) { console.log('error:', err) }
+      console.log('Done!!!!')
+    })
 
     return {
       pairname,
       pairemail,
+      pdfName,
       aptaddress,
       aptphone,
       apthosts,
@@ -330,6 +382,7 @@ function outputguestlist (distribution, score) {
   const fields = [
     'pairname',
     'pairemail',
+    'pdfName',
     'aptaddress',
     'aptphone',
     'apthosts',
@@ -345,7 +398,7 @@ function outputguestlist (distribution, score) {
   ]
   const opts = { fields }
 
-  var stream = fs.createWriteStream('pairscores/' + score + '.csv')
+  var stream = fs.createWriteStream('pairscores/best.csv')
   stream.once('open', function (fd) {
     try {
       const parser = new Json2csv(opts)
@@ -357,4 +410,5 @@ function outputguestlist (distribution, score) {
     }
     stream.end()
   })
+
 }
