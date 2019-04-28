@@ -1,10 +1,28 @@
 // Skapat av Christopher Nilsson (cNille @ github) för Lundakarnevalens cykelfest. 
 // Vid frågor kontakta: c@shapeapp.se
+// Små modifieringar av Martin Johansson (martinjohansson93 @ github)
+
 const _ = require('lodash')
 const json2csv = require('json2csv').Parser;
 const parse = require('csv-parse/lib/sync')
 const fs = require('fs')
 
+/// Configuration data:
+let successLimit = 20 // Number of solutions to find before stopping
+const sameGroupCheckActive = false // This check that pairs from the same "groups" do not meet.
+
+  // Points for the sizes of each meal.
+const GROUPSIZE6OR7POINTS = 2
+const GROUPSIZE5POINTS = -30
+const GROUPSIZE4POINTS = -70
+const GROUPSIZE8POINTS = -2
+  
+  // If the main course group size are three people. 
+  // The bigger groups have bigger budget, and the main course is the most expensive meal
+const MAINCOURSEFORGROUPSIZEOF3POINTS = 5
+
+  // Makes people bike some distance, but not to much
+const CHANGINGAREAONESPOINTS = 5 
 
 // 1. Load all input data
 let input = fs.readFileSync(__dirname + '/input.csv', 'utf-8');
@@ -108,19 +126,21 @@ function evaluate(mealList) {
     return points
   }
 
-  // Check if the same group meet eachother sometime, in that case return -1
-  let sameGroup = false
-  mealList.forEach(meal => {
-    meal.forEach(group => {
-      if (group[0].groups === group[1].groups || group[0].groups === group[2].groups || group[1].groups === group[2].groups) {
-        sameGroup = true
-      }
+  // Check if people from the same group meet each other, in that case return -1
+  if (sameGroupCheckActive) {
+    let sameGroup = false
+    mealList.forEach(meal => {
+      meal.forEach(group => {
+        if (group[0].groups === group[1].groups || group[0].groups === group[2].groups || group[1].groups === group[2].groups) {
+          sameGroup = true
+        }
+      })
     })
-  })
-
-  if (sameGroup) {
-    points = -1
-    return points
+    
+    if (sameGroup) {
+      points = -1
+      return points
+    }
   }
   // Select the group of the host
   // // Add points if all who eat desert together are grouped by afterparty.
@@ -138,16 +158,16 @@ function evaluate(mealList) {
     meal.forEach(group => {
       size = parseInt(group[0].size) + parseInt(group[1].size) + parseInt(group[2].size)
       if (size === 6 || size === 7) {
-        points += 2
+        points += GROUPSIZE6OR7POINTS
       }
       if (size === 8) {
-        points -= 2
+        points -= GROUPSIZE8POINTS
       }
       if (size < 5) {
-        points -= 70
+        points -= GROUPSIZE4POINTS
       }
       if (size < 6) {
-        points -= 30
+        points -= GROUPSIZE5POINTS
       }
     })
   })
@@ -155,7 +175,7 @@ function evaluate(mealList) {
   const main = mealList[1]
   main.forEach(group => {
     if (parseInt(group[0].size) === 3) {
-      points += 5
+      points += MAINCOURSEFORGROUPSIZEOF3POINTS
     }
   })
 
@@ -178,7 +198,7 @@ function evaluate(mealList) {
     }
     // Add extra points if one swap zone ones.
     if (areaChange === 2) {
-      points += 5
+      points += CHANGINGAREAONESPOINTS
     }
 
     // Add point the fewer times a pair stays in same area
@@ -203,7 +223,6 @@ function evaluate(mealList) {
 // 8. Iterate until the best distribution is found
 let nbrSuccess = 0
 let success = []
-let successLimit = 20
 let iteration = 0
 let points = 0
 let topPoint = 0
