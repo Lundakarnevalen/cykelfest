@@ -9,7 +9,7 @@ const fs = require('fs')
 
 /// Configuration data:
 let successLimit = 20 // Number of solutions to find before stopping
-const sameGroupCheckActive = false // This check that pairs from the same "groups" do not meet.
+const sameGroupCheck = true // This check that pairs from the same "groups" do not meet.
 
   // Points for the sizes of each meal.
 const GROUPSIZE6OR7POINTS = 2
@@ -127,7 +127,7 @@ function evaluate(mealList) {
   }
 
   // Check if people from the same group meet each other, in that case return -1
-  if (sameGroupCheckActive) {
+  if (sameGroupCheck) {
     let sameGroup = false
     mealList.forEach(meal => {
       meal.forEach(group => {
